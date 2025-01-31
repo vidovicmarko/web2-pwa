@@ -1,13 +1,13 @@
-const CACHE_NAME = "pwa-cache-v1";
 const FILES_TO_CACHE = [
     "/index.html",
     "/manifest.json",
+    "/styles.css",
     "/icon.png"
 ];
 
 self.addEventListener("install", (event) => {
     event.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => {
+        caches.open("pwa-cache-v1").then((cache) => {
             console.log("Keširam datoteke...");
             return cache.addAll(FILES_TO_CACHE);
         })
@@ -20,7 +20,7 @@ self.addEventListener("activate", (event) => {
         caches.keys().then((cacheNames) => {
             return Promise.all(
                 cacheNames.map((cache) => {
-                    if (cache !== CACHE_NAME) {
+                    if (cache !== "pwa-cache-v1") {
                         console.log("Brišem stari cache:", cache);
                         return caches.delete(cache);
                     }
@@ -28,14 +28,15 @@ self.addEventListener("activate", (event) => {
             );
         })
     );
+    self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {
     event.respondWith(
         caches.match(event.request).then((response) => {
-            return response || fetch(event.request);
-        }).catch(() => {
-            return caches.match("/index.html");
+            return response || fetch(event.request).catch(() => {
+                return caches.match("/index.html");
+            });
         })
     );
 });
@@ -47,21 +48,21 @@ self.addEventListener('sync', event => {
 });
 
 async function syncTasks() {
-    console.log("Sinkroniziram offline zadatke...");
-    self.registration.showNotification("To-Do Sync", {
-        body: "Vaši zadaci su uspješno sinkronizirani!",
-        icon: "/icon.png"
-    });
+    const db = await openDB();
+    const tx = db.transaction("tasks", "readonly");
+    const store = tx.objectStore("tasks");
+    const tasks = await store.getAll();
+
+    if (tasks.length > 0) {
+        for (const task of tasks) {
+            await processTask(task);
+            const deleteTx = db.transaction("tasks", "readwrite");
+            deleteTx.objectStore("tasks").delete(task.id);
+            await deleteTx.complete;
+        }
+    }
 }
 
-self.addEventListener("push", function (event) {
-    const options = {
-        body: "Dodali ste novi zadatak!",
-        icon: "/icon.png",
-        vibrate: [100, 50, 100]
-    };
-    event.waitUntil(
-        self.registration.showNotification("To-Do Lista", options)
-    );
-});
+
+
 

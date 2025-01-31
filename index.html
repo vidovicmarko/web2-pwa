@@ -24,11 +24,14 @@
         </div>
     </div>
     <script>
+
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').then(() => {
-                console.log("Service Worker registriran!");
+                console.log("Service Worker registriran");
             });
         }
+
+
 
         const input = document.getElementById("taskInput");
         const addTaskButton = document.getElementById("addTask");
@@ -39,7 +42,6 @@
         addTaskButton.addEventListener("click", () => {
             addTask(input.value);
         });
-
         clearAllButton.addEventListener("click", () => {
             taskList.innerHTML = "";
             clearAllTasks();
@@ -63,15 +65,33 @@
             voiceButton.style.display = "none";
         }
 
+        if ('serviceWorker' in navigator && 'SyncManager' in window) {
+            navigator.serviceWorker.ready.then((sw) => {
+                document.getElementById("addTask").addEventListener("click", async () => {
+                    if (!navigator.onLine) { 
+                        const task = document.getElementById("taskInput").value;
+                    if (task.trim() !== "") {
+                        await saveTaskOffline(task);
+                        sw.sync.register("sync-tasks").then(() => {
+                        console.log("Zadatak spremljen offline, Background Sync registriran.");
+                    }).catch((err) => {
+                        console.error("Greška prilikom registracije Background Synca:", err);
+                    });
+                    }
+                    }
+                });
+            });
+        }
+
+
         const DB_NAME = "TasksDB";
-        const DB_VERSION = 1;
         const STORE_NAME = "tasks";
 
         let db;
 
         function openDB() {
             return new Promise((resolve, reject) => {
-                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                const request = indexedDB.open(DB_NAME, 1);
 
                 request.onupgradeneeded = function (event) {
                     const db = event.target.result;
@@ -84,7 +104,6 @@
                     db = event.target.result;
                     resolve(db);
                 };
-
                 request.onerror = function (event) {
                     reject("Greška prilikom otvaranja IndexedDB: " + event.target.errorCode);
                 };
@@ -97,10 +116,11 @@
                 const store = tx.objectStore(STORE_NAME);
                 store.add({ task });
 
-                tx.oncomplete = () => console.log("Zapis spremljen u IndexedDB.");
+                tx.oncomplete = () => console.log("Zapis spremljen u IndexedDB");
                 tx.onerror = (event) => console.log("Greška prilikom spremanja zapisa:", event.target.error);
             });
         }
+
 
         function loadTasks() {
             openDB().then((db) => {
@@ -125,12 +145,21 @@
                     if (cursor) {
                         if (cursor.value.task === taskText) {
                             cursor.delete();
-                            console.log(`Zapis "${taskText}" obrisan iz IndexedDB.`);
+                            console.log(`Zapis "${taskText}" obrisan iz IndexedDB`);
+
+                            if (Notification.permission === "granted" && navigator.serviceWorker.controller) {
+                                navigator.serviceWorker.ready.then((registration) => {
+                                    registration.showNotification("Zapis obrisan!", {
+                                        body: `Obrisan je zapis: "${taskText}"`,
+                                        icon: "/icon.png"
+                            });
+                        });
+                    }
                         } else {
                             cursor.continue();
                         }
                     }
-                };
+                    };
             });
         }
 
@@ -166,9 +195,32 @@
             }
         }
 
+
+        function saveTaskOffline(task) {
+            return openDB().then((db) => {
+                const tx = db.transaction("tasks", "readwrite");
+                const store = tx.objectStore("tasks");
+                store.add({ task });
+                return tx.complete;
+            });
+    }
+
         document.addEventListener("DOMContentLoaded", () => {
             loadTasks();
+
+        if (Notification.permission === "default") {
+            Notification.requestPermission().then(permission => {
+                console.log("Dozvola za notifikacije:", permission);
+
+                if (permission === "granted") {
+                    alert("Notifikacije su omogućene");
+
+                } else {
+                    alert("Notifikacije nisu omogućene");
+                }
         });
+    }
+});
 
     </script>
 </body>
