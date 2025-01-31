@@ -196,15 +196,20 @@
         }
 
 
-        function saveTaskOffline(task) {
-            return openDB().then((db) => {
-                const tx = db.transaction("tasks", "readwrite");
-                const store = tx.objectStore("tasks");
-                store.add({ task });
-                return tx.complete;
-            });
-    }
+        async function saveTaskOffline(task) {
+            const db = await openDB();
+            const tx = db.transaction("tasks", "readwrite");
+            const store = tx.objectStore("tasks");
 
+
+            const allTasks = await store.getAll();
+            const isDuplicate = allTasks.some(t => t.task === task);
+    
+            if (!isDuplicate) {
+            await store.add({ id: new Date().toISOString(), task });     
+            } else {
+            }
+        }
         document.addEventListener("DOMContentLoaded", () => {
             loadTasks();
 
