@@ -73,7 +73,6 @@
                     if (task.trim() !== "") {
                         await saveTaskOffline(task);
                         sw.sync.register("sync-tasks").then(() => {
-                        console.log("Zadatak spremljen offline, Background Sync registriran.");
                     }).catch((err) => {
                         console.error("Greška prilikom registracije Background Synca:", err);
                     });
