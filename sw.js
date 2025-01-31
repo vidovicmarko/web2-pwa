@@ -8,7 +8,6 @@ const FILES_TO_CACHE = [
 self.addEventListener("install", (event) => {
     event.waitUntil(
         caches.open("pwa-cache-v1").then((cache) => {
-            console.log("Keširam datoteke...");
             return cache.addAll(FILES_TO_CACHE);
         })
     );
@@ -21,7 +20,6 @@ self.addEventListener("activate", (event) => {
             return Promise.all(
                 cacheNames.map((cache) => {
                     if (cache !== "pwa-cache-v1") {
-                        console.log("Brišem stari cache:", cache);
                         return caches.delete(cache);
                     }
                 })
@@ -30,6 +28,23 @@ self.addEventListener("activate", (event) => {
     );
     self.clients.claim();
 });
+
+function openDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open("TasksDB", 1);
+
+        request.onupgradeneeded = function (event) {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains("tasks")) {
+                db.createObjectStore("tasks", { keyPath: "id", autoIncrement: true });
+            }
+        };
+
+        request.onsuccess = function (event) {
+            resolve(event.target.result);
+        };
+    });
+}
 
 self.addEventListener("fetch", (event) => {
     event.respondWith(
