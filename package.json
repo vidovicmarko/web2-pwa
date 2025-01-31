@@ -1,0 +1,17 @@
+{
+  "name": "web2-pwa",
+  "version": "1.0.0",
+  "main": "sw.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "serve -s .",
+    "serve": "serve -s ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "serve": "^14.2.4"
+  }
+}

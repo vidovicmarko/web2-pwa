@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brzi podsjetnik</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class= header>
+    <img src="icon.png">
+    <h1>PODSJETNIK</h1>
+    </div>
+    <div class = "container">
+        <div class = "left">
+        <input type="text" id="taskInput" placeholder="Unesi zapis">
+        <button id="addTask">Dodaj zapis</button>
+        <button id="voiceInput">Glasovni unos zapisa</button>
+        <button id="clearAll">Obriši sve zapise</button>
+        </div>        
+        <div class = "right">
+        <ul id="taskList"></ul>
+        </div>
+    </div>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').then(() => {
+                console.log("Service Worker registriran!");
+            });
+        }
+
+        const input = document.getElementById("taskInput");
+        const addTaskButton = document.getElementById("addTask");
+        const voiceButton = document.getElementById("voiceInput");
+        const clearAllButton = document.getElementById("clearAll");
+        const taskList = document.getElementById("taskList");
+
+        addTaskButton.addEventListener("click", () => {
+            addTask(input.value);
+        });
+
+        clearAllButton.addEventListener("click", () => {
+            taskList.innerHTML = "";
+            clearAllTasks();
+        });
+
+
+        if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+            const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = "hr-HR";
+            recognition.continuous = false;
+            recognition.interimResults = false;
+
+            voiceButton.addEventListener("click", () => {
+                recognition.start();
+            });
+
+            recognition.onresult = (event) => {
+                input.value = event.results[0][0].transcript;
+            };
+        } else {
+            voiceButton.style.display = "none";
+        }
+
+        const DB_NAME = "TasksDB";
+        const DB_VERSION = 1;
+        const STORE_NAME = "tasks";
+
+        let db;
+
+        function openDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+                request.onupgradeneeded = function (event) {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME, { keyPath: "id", autoIncrement: true });
+                    }
+                };
+
+                request.onsuccess = function (event) {
+                    db = event.target.result;
+                    resolve(db);
+                };
+
+                request.onerror = function (event) {
+                    reject("Greška prilikom otvaranja IndexedDB: " + event.target.errorCode);
+                };
+            });
+        }
+
+        function saveTask(task) {
+            openDB().then((db) => {
+                const tx = db.transaction(STORE_NAME, "readwrite");
+                const store = tx.objectStore(STORE_NAME);
+                store.add({ task });
+
+                tx.oncomplete = () => console.log("Zapis spremljen u IndexedDB.");
+                tx.onerror = (event) => console.log("Greška prilikom spremanja zapisa:", event.target.error);
+            });
+        }
+
+        function loadTasks() {
+            openDB().then((db) => {
+                const tx = db.transaction(STORE_NAME, "readonly");
+                const store = tx.objectStore(STORE_NAME);
+                const request = store.getAll();
+
+                request.onsuccess = function () {
+                    request.result.forEach((item) => {
+                        addTask(item.task, false);
+                    });
+                };
+            });
+        }
+
+        function deleteTask(taskText) {
+            openDB().then((db) => {
+                const tx = db.transaction(STORE_NAME, "readwrite");
+                const store = tx.objectStore(STORE_NAME);
+                store.openCursor().onsuccess = function (event) {
+                    const cursor = event.target.result;
+                    if (cursor) {
+                        if (cursor.value.task === taskText) {
+                            cursor.delete();
+                            console.log(`Zapis "${taskText}" obrisan iz IndexedDB.`);
+                        } else {
+                            cursor.continue();
+                        }
+                    }
+                };
+            });
+        }
+
+        function clearAllTasks() {
+            openDB().then((db) => {
+                const tx = db.transaction(STORE_NAME, "readwrite");
+                const store = tx.objectStore(STORE_NAME);
+                store.clear();
+                console.log("Svi zapisi su obrisani iz IndexedDB.");
+            });
+        }
+
+        function addTask(task, saveToDB = true) {
+            if (task.trim() === "") return;
+
+            const li = document.createElement("li");
+            li.textContent = task;
+
+            const removeButton = document.createElement("button");
+            removeButton.textContent = "Obriši";
+            removeButton.style.marginLeft = "10px";
+
+            removeButton.addEventListener("click", () => {
+                li.remove();
+                deleteTask(task);
+            });
+
+            li.appendChild(removeButton);
+            taskList.appendChild(li);
+
+            if (saveToDB) {
+                saveTask(task);
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            loadTasks();
+        });
+
+    </script>
+</body>
+</html>
+
