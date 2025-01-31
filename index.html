@@ -129,6 +129,7 @@
                 const request = store.getAll();
 
                 request.onsuccess = function () {
+                    taskList.innerHTML = "";
                     request.result.forEach((item) => {
                         addTask(item.task, false);
                     });
@@ -203,7 +204,9 @@
 
 
             const allTasks = await store.getAll();
-            const isDuplicate = allTasks.some(t => t.task === task);
+            const tasksArray = allTasks ? Array.from(allTasks) : [];
+
+            const isDuplicate = tasksArray.some(t => t.task === task);
     
             if (!isDuplicate) {
             await store.add({ id: new Date().toISOString(), task });     
