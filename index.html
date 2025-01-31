@@ -194,19 +194,26 @@
             if (saveToDB) {
                 saveTask(task);
             }
+
+            document.getElementById("taskInput").value = "";
         }
 
 
         async function saveTaskOffline(task) {
             const db = await openDB();
-            const tx = db.transaction("tasks", "readwrite");
+            const tx = db.transaction("tasks", "readonly");
             const store = tx.objectStore("tasks");
 
 
-            const allTasks = await store.getAll();
-            const tasksArray = allTasks ? Array.from(allTasks) : [];
+            const allTasks = await new Promise((resolve, reject) => {
+                const request = store.getAll();
+                request.onsuccess = () => resolve(request.result || []);
+            });
 
-            const isDuplicate = tasksArray.some(t => t.task === task);
+    
+            const tasksArray = Array.isArray(allTasks) ? allTasks : [];
+
+             const isDuplicate = tasksArray.some(t => t.task === task);
     
             if (!isDuplicate) {
             await store.add({ id: new Date().toISOString(), task });     
